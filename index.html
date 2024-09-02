@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>国土地理院地図と指定点表示</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        #map { height: 600px; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script>
+        // 地図の初期化
+        var map = L.map('map').setView([35.5098884,139.6262077], 18);
+
+        // 国土地理院の地図タイルを追加
+        L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>'
+        }).addTo(map);
+
+        // テキストファイルを読み込む関数
+        function loadPoints() {
+            fetch('points.txt')
+                .then(response => response.text())
+                .then(data => {
+                    const lines = data.split('\n');
+                    lines.forEach(line => {
+                        if (line.trim() !== '') {
+                            const [name, lat, lng] = line.split(',');
+                            addMarker(name, parseFloat(lat), parseFloat(lng));
+                        }
+                    });
+                })
+                .catch(error => console.error('Error loading points:', error));
+        }
+
+        // マーカーを追加する関数
+        function addMarker(name, lat, lng) {
+            L.marker([lat, lng]).addTo(map)
+                .bindPopup(name);
+        }
+
+        // ポイントを読み込んで表示
+        loadPoints();
+    </script>
+</body>
+</html>
