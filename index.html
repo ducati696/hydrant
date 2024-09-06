@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>国土地理院地図と指定点表示</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.72.0/dist/L.Control.Locate.min.css" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.72.0/dist/L.Control.Locate.min.js"></script>
     <style>
         #map { height: 600px; }
     </style>
@@ -15,12 +17,40 @@
 
     <script>
         // 地図の初期化
-        var map = L.map('map').setView([35.5098884,139.6262077], 18);
+        var map = L.map('map');
 
         // 国土地理院の地図タイルを追加
         L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>'
         }).addTo(map);
+        // 現在地コントロールを追加
+        L.control.locate({
+            position: 'topright',
+            strings: {
+                title: "現在地を表示"
+            },
+            locateOptions: {
+                enableHighAccuracy: true
+            }
+        }).addTo(map);
+
+        // 現在地が見つかったときの処理
+        map.on('locationfound', function(e) {
+            var radius = e.accuracy / 2;
+            L.marker(e.latlng).addTo(map)
+                .bindPopup("現在地の半径" + radius + "m以内にいます").openPopup();
+            L.circle(e.latlng, radius).addTo(map);
+        });
+
+        // 現在地が見つからなかったときの処理
+        map.on('locationerror', function(e) {
+            console.error(e.message);
+            // デフォルトの位置を設定
+            map.setView([35.5098884, 139.6262077], 18);
+        });
+
+        // 地図の初期化時に現在地を取得して表示
+        map.locate({setView: true, maxZoom: 16});
 
         // テキストファイルを読み込む関数
         function loadPoints() {
