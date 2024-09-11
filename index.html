@@ -6,8 +6,10 @@
     <title>国土地理院地図と指定点表示</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.72.0/dist/L.Control.Locate.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/heyman/leaflet-usermarker/src/leaflet.usermarker.css" />
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.72.0/dist/L.Control.Locate.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/gh/heyman/leaflet-usermarker/src/leaflet.usermarker.js"></script>
     <style>
         #map { height: 600px; }
     </style>
@@ -23,6 +25,9 @@
         L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>'
         }).addTo(map);
+
+        var userMarker;
+
         // 現在地コントロールを追加
         L.control.locate({
             position: 'topright',
@@ -31,22 +36,35 @@
             },
             locateOptions: {
                 enableHighAccuracy: true
+            },
+            onLocationError: function(e) {
+                console.error(e.message);
+                // デフォルトの位置を設定
+                map.setView([35.5098884, 139.6262077], 18);
+            },
+            onLocationOutsideMapBounds: function(context) {
+                alert("現在地が地図の表示範囲外です");
             }
         }).addTo(map);
 
         // 現在地が見つかったときの処理
         map.on('locationfound', function(e) {
             var radius = e.accuracy / 2;
-            L.marker(e.latlng).addTo(map)
-                .bindPopup("現在地の半径" + radius + "m以内にいます").openPopup();
-            L.circle(e.latlng, radius).addTo(map);
-        });
-
-        // 現在地が見つからなかったときの処理
-        map.on('locationerror', function(e) {
-            console.error(e.message);
-            // デフォルトの位置を設定
-            map.setView([35.5098884, 139.6262077], 18);
+            if (userMarker) {
+                map.removeLayer(userMarker);
+            }
+            userMarker = L.userMarker(e.latlng, {
+                pulsing: true,
+                accuracy: radius,
+                smallIcon: true
+            }).addTo(map);
+            userMarker.setLatLng(e.latlng);
+            userMarker.setAccuracy(radius);
+            
+            // マーカーの色を緑に変更
+            userMarker.setStyle({color: 'green', fillColor: 'green'});
+            
+            map.setView(e.latlng, 16);
         });
 
         // 地図の初期化時に現在地を取得して表示
