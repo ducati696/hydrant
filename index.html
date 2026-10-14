@@ -4,14 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>国土地理院地図と指定点表示</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.72.0/dist/L.Control.Locate.min.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/heyman/leaflet-usermarker/src/leaflet.usermarker.css" />
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.72.0/dist/L.Control.Locate.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/gh/heyman/leaflet-usermarker/src/leaflet.usermarker.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha384-VzLXTJGPSyTLX6d96AxgkKvE/LRb7ECGyTxuwtpjHnVWVZs2gp5RDjeM/tgBnVdM" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.72.0/dist/L.Control.Locate.min.css" integrity="sha384-vPNGCZwbWwO+u7VXCcmLEJRcz/YmtXGdC3LOF8O4/IvddhfpYZI1O0tJszYkbsD2" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-usermarker@1.0.0/src/leaflet.usermarker.css" integrity="sha384-jrrbuZPFS+KSDShF4zDt94Ig/3vw6h9mYKk3HX/xn2VZg9aWCmLYX2074pHn/jlx" crossorigin="anonymous" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha384-RFZC58YeKApoNsIbBxf4z6JJXmh+geBSgkCQXFyh+4tiFSJmJBt+2FbjxW7Ar16M" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.72.0/dist/L.Control.Locate.min.js" integrity="sha384-g5auForUrJRA/c7ecPwFWRKeQqsJphdlumGoxbKTX6tpzREZyXRzeGwqjenHr4Yx" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-usermarker@1.0.0/src/leaflet.usermarker.js" integrity="sha384-chYKZqUezV6a6IF/fi44baQGliNY26EfZmAHiAH8Nz+BBhS7HmU5RN2KEE3T351Z" crossorigin="anonymous"></script>
     <style>
-        #map { height: 600px; }
+        html, body { margin: 0; height: 100%; }
+        #map { height: 100vh; height: 100dvh; }
     </style>
 </head>
 <body>
@@ -20,6 +21,10 @@
     <script>
         // 地図の初期化
         var map = L.map('map');
+
+        // 現在地が取れない場合に表示する位置
+        var defaultView = [35.5098884, 139.6262077];
+        map.setView(defaultView, 16);
 
         // 国土地理院の地図タイルを追加
         L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
@@ -40,7 +45,7 @@
             onLocationError: function(e) {
                 console.error(e.message);
                 // デフォルトの位置を設定
-                map.setView([35.5098884, 139.6262077], 18);
+                map.setView(defaultView, 18);
             },
             onLocationOutsideMapBounds: function(context) {
                 alert("現在地が地図の表示範囲外です");
@@ -56,19 +61,22 @@
             userMarker = L.userMarker(e.latlng, {
                 pulsing: true,
                 accuracy: radius,
-                smallIcon: true
+                smallIcon: true,
+                circleOpts: {color: 'green', fillColor: 'green', weight: 3, opacity: 0.5, fillOpacity: 0.15, interactive: false}
             }).addTo(map);
             userMarker.setLatLng(e.latlng);
             userMarker.setAccuracy(radius);
-            
-            // マーカーの色を緑に変更
-            userMarker.setStyle({color: 'green', fillColor: 'green'});
             
             map.setView(e.latlng, 16);
         });
 
         // 地図の初期化時に現在地を取得して表示
         map.locate({setView: true, maxZoom: 16});
+
+        // 現在地が取得できなかったときの処理
+        map.on('locationerror', function(e) {
+            console.error(e.message);
+        });
 
         // テキストファイルを読み込む関数
         function loadPoints() {
@@ -79,7 +87,13 @@
                     lines.forEach(line => {
                         if (line.trim() !== '') {
                             const [name, lat, lng] = line.split(',');
-                            addMarker(name, parseFloat(lat), parseFloat(lng));
+                            const latNum = parseFloat(lat);
+                            const lngNum = parseFloat(lng);
+                            if (isFinite(latNum) && isFinite(lngNum)) {
+                                addMarker(name, latNum, lngNum);
+                            } else {
+                                console.warn('Skipping invalid line:', line);
+                            }
                         }
                     });
                 })
