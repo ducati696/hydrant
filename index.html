@@ -13,10 +13,17 @@
     <style>
         html, body { margin: 0; height: 100%; }
         #map { height: 100vh; height: 100dvh; }
+        #status {
+            display: none;
+            position: absolute; top: 10px; left: 50px; right: 50px; z-index: 1000;
+            padding: 8px 12px; border-radius: 4px;
+            background: #c62828; color: #fff; font-size: 14px; text-align: center;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <div id="status" role="alert"></div>
 
     <script>
         // 地図の初期化
@@ -39,13 +46,15 @@
             strings: {
                 title: "現在地を表示"
             },
+            // 現在地の表示は下の userMarker に任せる
+            drawCircle: false,
+            drawMarker: false,
             locateOptions: {
                 enableHighAccuracy: true
             },
             onLocationError: function(e) {
+                // GPS が一時的に途切れても地図は動かさない
                 console.error(e.message);
-                // デフォルトの位置を設定
-                map.setView(defaultView, 18);
             },
             onLocationOutsideMapBounds: function(context) {
                 alert("現在地が地図の表示範囲外です");
@@ -53,21 +62,20 @@
         }).addTo(map);
 
         // 現在地が見つかったときの処理
+        // 地図の移動は map.locate と現在地コントロールに任せ、ここではマーカーだけ更新する
         map.on('locationfound', function(e) {
-            var radius = e.accuracy / 2;
-            if (userMarker) {
-                map.removeLayer(userMarker);
+            // e.accuracy は精度の半径（メートル）
+            if (!userMarker) {
+                userMarker = L.userMarker(e.latlng, {
+                    pulsing: true,
+                    accuracy: e.accuracy,
+                    smallIcon: true,
+                    circleOpts: {color: 'green', fillColor: 'green', weight: 3, opacity: 0.5, fillOpacity: 0.15, interactive: false}
+                }).addTo(map);
+            } else {
+                userMarker.setLatLng(e.latlng);
+                userMarker.setAccuracy(e.accuracy);
             }
-            userMarker = L.userMarker(e.latlng, {
-                pulsing: true,
-                accuracy: radius,
-                smallIcon: true,
-                circleOpts: {color: 'green', fillColor: 'green', weight: 3, opacity: 0.5, fillOpacity: 0.15, interactive: false}
-            }).addTo(map);
-            userMarker.setLatLng(e.latlng);
-            userMarker.setAccuracy(radius);
-            
-            map.setView(e.latlng, 16);
         });
 
         // 地図の初期化時に現在地を取得して表示
@@ -78,10 +86,22 @@
             console.error(e.message);
         });
 
+        // 地図の上にメッセージを表示する関数
+        function showStatus(message) {
+            var el = document.getElementById('status');
+            el.textContent = message;
+            el.style.display = 'block';
+        }
+
         // テキストファイルを読み込む関数
         function loadPoints() {
             fetch('points.txt')
-                .then(response => response.text())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                    return response.text();
+                })
                 .then(data => {
                     const lines = data.split('\n');
                     lines.forEach(line => {
@@ -97,7 +117,10 @@
                         }
                     });
                 })
-                .catch(error => console.error('Error loading points:', error));
+                .catch(error => {
+                    console.error('Error loading points:', error);
+                    showStatus('消火栓データを読み込めませんでした');
+                });
         }
 
         // マーカーを追加する関数
