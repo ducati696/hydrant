@@ -19,6 +19,8 @@
             padding: 8px 12px; border-radius: 4px;
             background: #c62828; color: #fff; font-size: 14px; text-align: center;
         }
+        .popup-name { font-weight: bold; font-size: 15px; }
+        .popup-link { display: inline-block; margin-top: 6px; padding: 6px 0; font-size: 15px; }
     </style>
 </head>
 <body>
@@ -126,7 +128,27 @@
         // マーカーを追加する関数
         function addMarker(name, lat, lng) {
             L.marker([lat, lng]).addTo(map)
-                .bindPopup(name);
+                .bindPopup(createPopup(name, lat, lng));
+        }
+
+        // 名前と Google マップの道案内リンクを持つ吹き出しを作る関数
+        function createPopup(name, lat, lng) {
+            var container = document.createElement('div');
+
+            var title = document.createElement('div');
+            title.className = 'popup-name';
+            title.textContent = name;
+            container.appendChild(title);
+
+            var link = document.createElement('a');
+            link.className = 'popup-link';
+            link.href = 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = 'Google マップで道案内';
+            container.appendChild(link);
+
+            return container;
         }
 
         // ポイントを読み込んで表示
