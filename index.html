@@ -19,6 +19,15 @@
             padding: 8px 12px; border-radius: 4px;
             background: #c62828; color: #fff; font-size: 14px; text-align: center;
         }
+        /* 現在地ボタンのアイコン（ボタンの文字色で塗る） */
+        .locate-icon {
+            display: inline-block; width: 18px; height: 18px; vertical-align: middle;
+            background-color: currentColor;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A9 9 0 0 0 13 3.06V1h-2v2.06A9 9 0 0 0 3.06 11H1v2h2.06A9 9 0 0 0 11 20.94V23h2v-2.06A9 9 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z'/%3E%3C/svg%3E") no-repeat center / contain;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A9 9 0 0 0 13 3.06V1h-2v2.06A9 9 0 0 0 3.06 11H1v2h2.06A9 9 0 0 0 11 20.94V23h2v-2.06A9 9 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z'/%3E%3C/svg%3E") no-repeat center / contain;
+        }
+        .locate-icon-loading { animation: locate-spin 1s linear infinite; }
+        @keyframes locate-spin { to { transform: rotate(360deg); } }
         .popup-name { font-weight: bold; font-size: 15px; }
         .popup-link { display: inline-block; margin-top: 6px; padding: 6px 0; font-size: 15px; }
     </style>
@@ -48,6 +57,9 @@
             strings: {
                 title: "現在地を表示"
             },
+            // Font Awesome を読み込んでいないので、自前のアイコンを使う
+            icon: 'locate-icon',
+            iconLoading: 'locate-icon locate-icon-loading',
             // 現在地の表示は下の userMarker に任せる
             drawCircle: false,
             drawMarker: false,
