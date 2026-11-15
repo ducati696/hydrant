@@ -1,6 +1,7 @@
 {
   "type": "FeatureCollection",
   "name": "消火栓",
+  "updated": "2026-11-15",
   "features": [
     {"type":"Feature","id":1,"geometry":{"type":"Point","coordinates":[139.6270982,35.509137]},"properties":{"number":1,"name":"消火栓 No.1（地下式）","type":"地下式","address":"〒222-0021 神奈川県横浜市港北区篠原北１丁目１０付近","aux_info":"","created":"2024-08-29T01:06:55Z"}},
     {"type":"Feature","id":2,"geometry":{"type":"Point","coordinates":[139.6262077,35.5098884]},"properties":{"number":2,"name":"消火栓 No.2（地下式）","type":"地下式","address":"〒222-0021 神奈川県横浜市港北区篠原北２丁目１１付近","aux_info":"","created":"2024-08-29T01:05:50Z"}},
