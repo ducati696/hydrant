@@ -29,6 +29,12 @@
         .locate-icon-loading { animation: locate-spin 1s linear infinite; }
         @keyframes locate-spin { to { transform: rotate(360deg); } }
         .popup-name { font-weight: bold; font-size: 15px; }
+        .popup-address { margin-top: 2px; font-size: 13px; color: #555; }
+        /* 16px 未満だと iOS で入力時に画面が拡大されるため 16px にする */
+        .popup-aux {
+            display: block; width: 100%; box-sizing: border-box; margin-top: 8px;
+            padding: 4px 6px; font: inherit; font-size: 16px; resize: vertical;
+        }
         .popup-link { display: inline-block; margin-top: 6px; padding: 6px 0; font-size: 15px; }
     </style>
 </head>
@@ -107,29 +113,61 @@
             el.style.display = 'block';
         }
 
-        // テキストファイルを読み込む関数
+        // 補助情報はこの端末のブラウザに保存する（消火栓の番号ごと）
+        var AUX_KEY_PREFIX = 'hydrant-aux-';
+
+        // 端末に保存した補助情報を返す。なければ GeoJSON の aux_info を使う
+        function loadAux(id, fallback) {
+            try {
+                var saved = localStorage.getItem(AUX_KEY_PREFIX + id);
+                return saved !== null ? saved : fallback;
+            } catch (e) {
+                return fallback;
+            }
+        }
+
+        function saveAux(id, value, fallback) {
+            try {
+                if (value === fallback) {
+                    localStorage.removeItem(AUX_KEY_PREFIX + id);
+                } else {
+                    localStorage.setItem(AUX_KEY_PREFIX + id, value);
+                }
+            } catch (e) {
+                console.warn('補助情報を保存できませんでした', e);
+            }
+        }
+
+        // 座標が正しい Point だけを地図に載せる
+        function isValidPoint(feature) {
+            var g = feature && feature.geometry;
+            if (!g || g.type !== 'Point' || !Array.isArray(g.coordinates)) {
+                console.warn('Skipping invalid feature:', feature);
+                return false;
+            }
+            var ok = isFinite(parseFloat(g.coordinates[0])) && isFinite(parseFloat(g.coordinates[1]));
+            if (!ok) {
+                console.warn('Skipping invalid feature:', feature);
+            }
+            return ok;
+        }
+
+        // GeoJSON を読み込んでマーカーを表示する関数
         function loadPoints() {
-            fetch('points.txt')
+            fetch('hydrants.geojson')
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('HTTP ' + response.status);
                     }
-                    return response.text();
+                    return response.json();
                 })
                 .then(data => {
-                    const lines = data.split('\n');
-                    lines.forEach(line => {
-                        if (line.trim() !== '') {
-                            const [name, lat, lng] = line.split(',');
-                            const latNum = parseFloat(lat);
-                            const lngNum = parseFloat(lng);
-                            if (isFinite(latNum) && isFinite(lngNum)) {
-                                addMarker(name, latNum, lngNum);
-                            } else {
-                                console.warn('Skipping invalid line:', line);
-                            }
+                    L.geoJSON(data, {
+                        filter: isValidPoint,
+                        onEachFeature: function(feature, layer) {
+                            layer.bindPopup(createPopup(feature), {minWidth: 220});
                         }
-                    });
+                    }).addTo(map);
                 })
                 .catch(error => {
                     console.error('Error loading points:', error);
@@ -137,20 +175,39 @@
                 });
         }
 
-        // マーカーを追加する関数
-        function addMarker(name, lat, lng) {
-            L.marker([lat, lng]).addTo(map)
-                .bindPopup(createPopup(name, lat, lng));
-        }
+        // 名前・住所・補助情報の入力欄・Google マップの道案内リンクを持つ吹き出しを作る関数
+        function createPopup(feature) {
+            var props = feature.properties || {};
+            // GeoJSON の座標は [経度, 緯度] の順
+            var lng = feature.geometry.coordinates[0];
+            var lat = feature.geometry.coordinates[1];
+            var id = feature.id != null ? feature.id : (props.number != null ? props.number : lat + ',' + lng);
+            var auxDefault = props.aux_info || '';
 
-        // 名前と Google マップの道案内リンクを持つ吹き出しを作る関数
-        function createPopup(name, lat, lng) {
             var container = document.createElement('div');
 
             var title = document.createElement('div');
             title.className = 'popup-name';
-            title.textContent = name;
+            title.textContent = props.name || '消火栓';
             container.appendChild(title);
+
+            if (props.address) {
+                var address = document.createElement('div');
+                address.className = 'popup-address';
+                address.textContent = props.address;
+                container.appendChild(address);
+            }
+
+            var aux = document.createElement('textarea');
+            aux.className = 'popup-aux';
+            aux.rows = 2;
+            aux.placeholder = '補助情報を入力';
+            aux.setAttribute('aria-label', '補助情報');
+            aux.value = loadAux(id, auxDefault);
+            aux.addEventListener('input', function() {
+                saveAux(id, aux.value, auxDefault);
+            });
+            container.appendChild(aux);
 
             var link = document.createElement('a');
             link.className = 'popup-link';
