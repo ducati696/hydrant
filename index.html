@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>国土地理院地図と指定点表示</title>
+    <title>消火栓マップ｜横浜市港北区 篠原北周辺</title>
+    <meta name="description" content="横浜市港北区 篠原北・篠原町・錦が丘・富士塚周辺の消火栓の位置を、現在地から近い順に色分けして表示する地図です。">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#c62828" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#1e1e1e" media="(prefers-color-scheme: dark)">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha384-VzLXTJGPSyTLX6d96AxgkKvE/LRb7ECGyTxuwtpjHnVWVZs2gp5RDjeM/tgBnVdM" crossorigin="anonymous" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.72.0/dist/L.Control.Locate.min.css" integrity="sha384-vPNGCZwbWwO+u7VXCcmLEJRcz/YmtXGdC3LOF8O4/IvddhfpYZI1O0tJszYkbsD2" crossorigin="anonymous" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-usermarker@1.0.0/src/leaflet.usermarker.css" integrity="sha384-jrrbuZPFS+KSDShF4zDt94Ig/3vw6h9mYKk3HX/xn2VZg9aWCmLYX2074pHn/jlx" crossorigin="anonymous" />
@@ -11,14 +15,35 @@
     <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.72.0/dist/L.Control.Locate.min.js" integrity="sha384-g5auForUrJRA/c7ecPwFWRKeQqsJphdlumGoxbKTX6tpzREZyXRzeGwqjenHr4Yx" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet-usermarker@1.0.0/src/leaflet.usermarker.js" integrity="sha384-chYKZqUezV6a6IF/fi44baQGliNY26EfZmAHiAH8Nz+BBhS7HmU5RN2KEE3T351Z" crossorigin="anonymous"></script>
     <style>
+        :root {
+            --panel-bg: #fff;
+            --panel-fg: #222;
+            --panel-sub: #555;
+            --panel-hover: #f0f0f0;
+            /* 近い順に 赤・黄・青、それ以外は緑 */
+            --near1: #d32f2f;
+            --near2: #fdd835;
+            --near3: #1976d2;
+            --other: #2e7d32;
+        }
         html, body { margin: 0; height: 100%; }
         #map { height: 100vh; height: 100dvh; }
+
+        /* 地図の上に出すお知らせ（複数を縦に並べる） */
         #status {
-            display: none;
             position: absolute; top: 10px; left: 50px; right: 50px; z-index: 1000;
-            padding: 8px 12px; border-radius: 4px;
-            background: #c62828; color: #fff; font-size: 14px; text-align: center;
+            display: flex; flex-direction: column; gap: 6px;
+            pointer-events: none;
         }
+        .status-item {
+            padding: 8px 12px; border-radius: 4px;
+            font-size: 14px; text-align: center;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+        }
+        .status-error { background: #c62828; color: #fff; }
+        .status-warn { background: #ffb300; color: #222; }
+        .status-info { background: #455a64; color: #fff; }
+
         /* 現在地ボタンのアイコン（ボタンの文字色で塗る） */
         .locate-icon {
             display: inline-block; width: 18px; height: 18px; vertical-align: middle;
@@ -28,19 +53,71 @@
         }
         .locate-icon-loading { animation: locate-spin 1s linear infinite; }
         @keyframes locate-spin { to { transform: rotate(360deg); } }
+
+        /* 消火栓のピン。中の数字は消火栓の番号 */
+        .pin { background: none; border: 0; }
+        .pin svg { display: block; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+        .pin path { fill: var(--other); stroke: #fff; stroke-width: 1.5; }
+        .pin text { font: bold 11px sans-serif; fill: #fff; }
+        .pin-near1 path { fill: var(--near1); }
+        .pin-near2 path { fill: var(--near2); stroke: #222; }
+        .pin-near2 text { fill: #222; }
+        .pin-near3 path { fill: var(--near3); }
+
+        /* 最寄り3箇所の一覧 */
+        .nearest {
+            background: var(--panel-bg); color: var(--panel-fg);
+            border-radius: 4px; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+            padding: 2px; font-size: 14px;
+        }
+        .nearest:empty { display: none; }
+        .nearest button {
+            display: flex; align-items: center; gap: 8px; width: 100%;
+            min-height: 34px; padding: 4px 10px;
+            border: 0; border-radius: 3px; background: none; color: inherit;
+            font: inherit; text-align: left; cursor: pointer;
+        }
+        .nearest button:hover { background: var(--panel-hover); }
+        .nearest .dot {
+            flex: none; width: 13px; height: 13px; border-radius: 50%;
+            border: 1px solid rgba(0, 0, 0, 0.45);
+        }
+        .nearest .dist { margin-left: auto; padding-left: 8px; font-variant-numeric: tabular-nums; }
+
         .popup-name { font-weight: bold; font-size: 15px; }
-        .popup-address { margin-top: 2px; font-size: 13px; color: #555; }
+        .popup-address { margin-top: 2px; font-size: 13px; color: var(--panel-sub); }
         /* 16px 未満だと iOS で入力時に画面が拡大されるため 16px にする */
         .popup-aux {
             display: block; width: 100%; box-sizing: border-box; margin-top: 8px;
             padding: 4px 6px; font: inherit; font-size: 16px; resize: vertical;
         }
         .popup-link { display: inline-block; margin-top: 6px; padding: 6px 0; font-size: 15px; }
+
+        /* 夜間モード（端末のダークモード設定に自動で追従） */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --panel-bg: #242424;
+                --panel-fg: #eee;
+                --panel-sub: #bbb;
+                --panel-hover: #3a3a3a;
+            }
+            .leaflet-container { background: #111; }
+            /* 国土地理院の標準地図を反転して暗くする（色相は戻す） */
+            .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9); }
+            .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--panel-bg); color: var(--panel-fg); }
+            .leaflet-container a.leaflet-popup-close-button { color: #bbb; }
+            .leaflet-bar a, .leaflet-bar a:hover { background-color: var(--panel-bg); color: var(--panel-fg); border-bottom-color: #444; }
+            .leaflet-bar a:hover { background-color: var(--panel-hover); }
+            .leaflet-bar a.leaflet-disabled { background-color: #1c1c1c; color: #666; }
+            .leaflet-container .leaflet-control-attribution { background: rgba(36, 36, 36, 0.8); color: #ccc; }
+            .leaflet-container a { color: #8ab4f8; }
+            .popup-aux { background: #1a1a1a; color: #eee; border: 1px solid #555; }
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
-    <div id="status" role="alert"></div>
+    <div id="status" role="status" aria-live="polite"></div>
 
     <script>
         // 地図の初期化
@@ -51,14 +128,44 @@
         map.setView(defaultView, 16);
 
         // 国土地理院の地図タイルを追加
-        L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>'
+        // crossOrigin を付けると、オフライン用の保存で容量を無駄に消費しない
+        var TILE_URL = 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png';
+        L.tileLayer(TILE_URL, {
+            attribution: '&copy; <a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>',
+            maxNativeZoom: 18,
+            maxZoom: 19,
+            crossOrigin: true
         }).addTo(map);
 
+        // 地図の上のお知らせを出す・消す関数（key ごとに1行）
+        function setStatus(key, message, level) {
+            var box = document.getElementById('status');
+            var el = box.querySelector('[data-key="' + key + '"]');
+            if (!el) {
+                el = document.createElement('div');
+                el.setAttribute('data-key', key);
+                box.appendChild(el);
+            }
+            el.className = 'status-item status-' + (level || 'error');
+            if (el.textContent !== message) {
+                el.textContent = message;
+            }
+        }
+
+        function clearStatus(key) {
+            var el = document.getElementById('status').querySelector('[data-key="' + key + '"]');
+            if (el) {
+                el.remove();
+            }
+        }
+
+        // ---- 現在地 ----
+
         var userMarker;
+        var lastLatLng = null;
 
         // 現在地コントロールを追加
-        L.control.locate({
+        var locateControl = L.control.locate({
             position: 'topright',
             strings: {
                 title: "現在地を表示"
@@ -69,20 +176,19 @@
             // 現在地の表示は下の userMarker に任せる
             drawCircle: false,
             drawMarker: false,
+            initialZoomLevel: 17,
             locateOptions: {
-                enableHighAccuracy: true
+                enableHighAccuracy: true,
+                maxZoom: 17
             },
             onLocationError: function(e) {
                 // GPS が一時的に途切れても地図は動かさない
                 console.error(e.message);
-            },
-            onLocationOutsideMapBounds: function(context) {
-                alert("現在地が地図の表示範囲外です");
             }
         }).addTo(map);
 
         // 現在地が見つかったときの処理
-        // 地図の移動は map.locate と現在地コントロールに任せ、ここではマーカーだけ更新する
+        // 地図の移動は現在地コントロールに任せ、ここではマーカーと最寄りの色分けを更新する
         map.on('locationfound', function(e) {
             // e.accuracy は精度の半径（メートル）
             if (!userMarker) {
@@ -90,28 +196,118 @@
                     pulsing: true,
                     accuracy: e.accuracy,
                     smallIcon: true,
-                    circleOpts: {color: 'green', fillColor: 'green', weight: 3, opacity: 0.5, fillOpacity: 0.15, interactive: false}
+                    circleOpts: {color: '#607d8b', fillColor: '#607d8b', weight: 2, opacity: 0.5, fillOpacity: 0.12, interactive: false}
                 }).addTo(map);
             } else {
                 userMarker.setLatLng(e.latlng);
                 userMarker.setAccuracy(e.accuracy);
             }
+            lastLatLng = e.latlng;
+            updateNearest();
         });
-
-        // 地図の初期化時に現在地を取得して表示
-        map.locate({setView: true, maxZoom: 16});
 
         // 現在地が取得できなかったときの処理
         map.on('locationerror', function(e) {
             console.error(e.message);
         });
 
-        // 地図の上にメッセージを表示する関数
-        function showStatus(message) {
-            var el = document.getElementById('status');
-            el.textContent = message;
-            el.style.display = 'block';
+        // 起動時から現在地を追い続ける（地図を手で動かすと追従だけ止まる）
+        locateControl.start();
+
+        // ---- 消火栓のピンと最寄り3箇所 ----
+
+        // 近い順の表示。rank 0〜2 が最寄り3箇所、3 はそれ以外
+        var RANKS = [
+            {cls: 'near1', color: 'var(--near1)', label: '最寄り'},
+            {cls: 'near2', color: 'var(--near2)', label: '2番目'},
+            {cls: 'near3', color: 'var(--near3)', label: '3番目'}
+        ];
+        var OTHER_RANK = RANKS.length;
+        // 最寄りの消火栓がこれより遠ければ「範囲外」とみなす（メートル）
+        var OUT_OF_RANGE_M = 200;
+
+        // {marker, latlng, label, name, rank} の一覧
+        var hydrants = [];
+
+        function makeIcon(label, rank) {
+            var near = rank < OTHER_RANK;
+            var w = near ? 36 : 26;
+            var h = near ? 50 : 36;
+            return L.divIcon({
+                className: 'pin pin-' + (near ? RANKS[rank].cls : 'other'),
+                html: '<svg viewBox="0 0 26 36" width="' + w + '" height="' + h + '" aria-hidden="true">' +
+                      '<path d="M13 1C6.4 1 1 6.3 1 12.9 1 21.5 13 35 13 35s12-13.5 12-22.1C25 6.3 19.6 1 13 1z"/>' +
+                      '<text x="13" y="17" text-anchor="middle">' + label + '</text></svg>',
+                iconSize: [w, h],
+                iconAnchor: [w / 2, h],
+                popupAnchor: [0, -h + 6]
+            });
         }
+
+        function formatDistance(m) {
+            return m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(1) + ' km';
+        }
+
+        // 最寄り3箇所の一覧（左下）
+        var nearestBox = L.DomUtil.create('div', 'nearest');
+        nearestBox.setAttribute('aria-label', '現在地から近い消火栓');
+        var nearestControl = L.control({position: 'bottomleft'});
+        nearestControl.onAdd = function() {
+            L.DomEvent.disableClickPropagation(nearestBox);
+            L.DomEvent.disableScrollPropagation(nearestBox);
+            return nearestBox;
+        };
+        nearestControl.addTo(map);
+
+        // 現在地からの距離で並べ直し、色分けと一覧と範囲外警告を更新する
+        function updateNearest() {
+            if (!lastLatLng || hydrants.length === 0) {
+                return;
+            }
+            var sorted = hydrants.map(function(h) {
+                return {h: h, dist: lastLatLng.distanceTo(h.latlng)};
+            }).sort(function(a, b) { return a.dist - b.dist; });
+
+            sorted.forEach(function(item, i) {
+                var rank = Math.min(i, OTHER_RANK);
+                if (item.h.rank !== rank) {
+                    item.h.rank = rank;
+                    item.h.marker.setIcon(makeIcon(item.h.label, rank));
+                    // 最寄りほど手前に表示する
+                    item.h.marker.setZIndexOffset(rank < OTHER_RANK ? 1000 * (OTHER_RANK - rank) : 0);
+                }
+            });
+
+            nearestBox.textContent = '';
+            sorted.slice(0, OTHER_RANK).forEach(function(item, i) {
+                var button = document.createElement('button');
+                button.type = 'button';
+                var dot = document.createElement('span');
+                dot.className = 'dot';
+                dot.style.background = RANKS[i].color;
+                var name = document.createElement('span');
+                name.textContent = item.h.label ? 'No.' + item.h.label : item.h.name;
+                var dist = document.createElement('span');
+                dist.className = 'dist';
+                dist.textContent = formatDistance(item.dist);
+                button.append(dot, name, dist);
+                button.setAttribute('aria-label', RANKS[i].label + ' ' + item.h.name + ' ' + formatDistance(item.dist));
+                button.addEventListener('click', function() {
+                    map.setView(item.h.latlng, Math.max(map.getZoom(), 17));
+                    item.h.marker.openPopup();
+                });
+                nearestBox.appendChild(button);
+            });
+
+            if (sorted[0].dist > OUT_OF_RANGE_M) {
+                setStatus('range', '登録範囲外です（最寄りの登録消火栓まで約 ' + formatDistance(sorted[0].dist) +
+                    '）。この地図にない消火栓が近くにある可能性があります', 'warn');
+            } else {
+                clearStatus('range');
+            }
+        }
+
+        // ---- 補助情報 ----
 
         // 補助情報はこの端末のブラウザに保存する（消火栓の番号ごと）
         var AUX_KEY_PREFIX = 'hydrant-aux-';
@@ -137,6 +333,8 @@
                 console.warn('補助情報を保存できませんでした', e);
             }
         }
+
+        // ---- データの読み込み ----
 
         // 座標が正しい Point だけを地図に載せる
         function isValidPoint(feature) {
@@ -164,14 +362,38 @@
                 .then(data => {
                     L.geoJSON(data, {
                         filter: isValidPoint,
+                        pointToLayer: function(feature, latlng) {
+                            var props = feature.properties || {};
+                            // ピンに入れるのは数字の番号だけ
+                            var label = /^\d+$/.test(String(props.number)) ? String(props.number) : '';
+                            var name = props.name || '消火栓';
+                            var marker = L.marker(latlng, {
+                                icon: makeIcon(label, OTHER_RANK),
+                                title: name,
+                                alt: name
+                            });
+                            hydrants.push({marker: marker, latlng: latlng, label: label, name: name, rank: OTHER_RANK});
+                            return marker;
+                        },
                         onEachFeature: function(feature, layer) {
-                            layer.bindPopup(createPopup(feature), {minWidth: 220});
+                            // 上のお知らせ帯に吹き出しが隠れないよう、上側に余白を取る
+                            layer.bindPopup(createPopup(feature), {minWidth: 220, autoPanPaddingTopLeft: [10, 80], autoPanPaddingBottomRight: [10, 10]});
                         }
                     }).addTo(map);
+
+                    // データの更新日を地図の右下に出す
+                    var info = '消火栓 ' + hydrants.length + '件';
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(data.updated)) {
+                        info += '（' + data.updated + ' 更新）';
+                    }
+                    map.attributionControl.addAttribution(info);
+
+                    updateNearest();
+                    saveTilesForOffline();
                 })
                 .catch(error => {
                     console.error('Error loading points:', error);
-                    showStatus('消火栓データを読み込めませんでした');
+                    setStatus('data', '消火栓データを読み込めませんでした', 'error');
                 });
         }
 
@@ -218,6 +440,98 @@
             container.appendChild(link);
 
             return container;
+        }
+
+        // ---- オフライン対応 ----
+
+        // ページ・データ・ライブラリ・地図タイルの保存は sw.js が行う
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('sw.js').catch(function(e) {
+                    console.warn('オフライン対応を有効にできませんでした', e);
+                });
+            });
+        }
+
+        function updateOnlineStatus() {
+            if (navigator.onLine) {
+                clearStatus('offline');
+            } else {
+                setStatus('offline', 'オフラインです。保存済みの地図とデータを表示しています', 'info');
+            }
+        }
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus();
+
+        // sw.js と同じ名前にすること
+        var TILE_CACHE = 'hydrant-tiles-v1';
+        // 消火栓のある範囲の周囲どこまでの地図を保存するか（メートル）
+        var OFFLINE_MARGIN_M = 250;
+        var OFFLINE_ZOOMS = [14, 15, 16, 17, 18];
+        var OFFLINE_MAX_TILES = 500;
+
+        function tileX(lng, z) {
+            return Math.floor((lng + 180) / 360 * Math.pow(2, z));
+        }
+
+        function tileY(lat, z) {
+            var rad = lat * Math.PI / 180;
+            return Math.floor((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * Math.pow(2, z));
+        }
+
+        // 消火栓のある範囲の地図タイルを、一度も見ていない場所も含めて保存しておく
+        async function saveTilesForOffline() {
+            if (!('caches' in window) || !navigator.onLine || hydrants.length === 0) {
+                return;
+            }
+            // データ節約モードでは、見た場所だけを保存する（sw.js の動作）
+            if (navigator.connection && navigator.connection.saveData) {
+                return;
+            }
+            try {
+                var bounds = L.latLngBounds(hydrants.map(function(h) { return h.latlng; }));
+                var padLat = OFFLINE_MARGIN_M / 111320;
+                var padLng = padLat / Math.cos(bounds.getCenter().lat * Math.PI / 180);
+                var south = bounds.getSouth() - padLat, north = bounds.getNorth() + padLat;
+                var west = bounds.getWest() - padLng, east = bounds.getEast() + padLng;
+
+                var urls = [];
+                OFFLINE_ZOOMS.forEach(function(z) {
+                    for (var x = tileX(west, z); x <= tileX(east, z); x++) {
+                        for (var y = tileY(north, z); y <= tileY(south, z); y++) {
+                            urls.push(TILE_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y));
+                        }
+                    }
+                });
+                if (urls.length > OFFLINE_MAX_TILES) {
+                    console.warn('保存する地図タイルが多すぎるため一部だけ保存します', urls.length);
+                    urls = urls.slice(0, OFFLINE_MAX_TILES);
+                }
+
+                var cache = await caches.open(TILE_CACHE);
+                // 国土地理院のサーバーに負荷をかけないよう、少しずつ取得する
+                var next = 0;
+                async function worker() {
+                    while (next < urls.length) {
+                        var url = urls[next++];
+                        if (await cache.match(url)) {
+                            continue;
+                        }
+                        try {
+                            var response = await fetch(url, {mode: 'cors'});
+                            if (response.ok) {
+                                await cache.put(url, response);
+                            }
+                        } catch (e) {
+                            // 取れなかったタイルは次回また試す
+                        }
+                    }
+                }
+                await Promise.all([worker(), worker(), worker()]);
+            } catch (e) {
+                console.warn('地図タイルを保存できませんでした', e);
+            }
         }
 
         // ポイントを読み込んで表示
