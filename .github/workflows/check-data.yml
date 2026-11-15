@@ -1,0 +1,35 @@
+name: データチェック
+
+# hydrants.geojson を変更したときに、形式・座標・番号・更新日を確認する。
+# Actions タブの「Run workflow」から手動でも実行できる。
+on:
+  push:
+    paths:
+      - hydrants.geojson
+      - scripts/check-data.mjs
+      - .github/workflows/check-data.yml
+  pull_request:
+    paths:
+      - hydrants.geojson
+      - scripts/check-data.mjs
+      - .github/workflows/check-data.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: hydrants.geojson の確認
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 直前の版と比べるため、1つ前のコミットまで取得する
+          fetch-depth: 2
+
+      - name: 直前の版を取り出す
+        run: git show HEAD^:hydrants.geojson > "$RUNNER_TEMP/previous.geojson" 2>/dev/null || rm -f "$RUNNER_TEMP/previous.geojson"
+
+      - name: データをチェックする
+        run: node scripts/check-data.mjs hydrants.geojson "$RUNNER_TEMP/previous.geojson"
